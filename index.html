@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه پیگیری آزمون‌ها</title>
+    <!-- Tailwind CSS CDN -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- Persian Datepicker -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/persian-datepicker/1.2.0/css/persian-datepicker.min.css">
+    <!-- jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- Jalaali JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jalaali-js/1.1.0/jalaali.min.js"></script>
+    <!-- Persian Datepicker -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/persian-datepicker/1.2.0/js/persian-datepicker.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <style>
+        /* برخی از سبک‌های ضروری که در تیلویند وجود ندارند */
+        .persian-datepicker-container { z-index: 1000; }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    /* Adjust header for mobile */
+    header {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+    
+    /* Adjust main layout for mobile */
+    .flex {
+        flex-direction: column;
+    }
+    
+    /* Sidebar styling for mobile */
+    .w-64 {
+        width: 100%;
+        position: static;
+        height: auto;
+        margin-top: 4rem;
+        margin-bottom: 1rem;
+        overflow-y: visible;
+    }
+    
+    /* Main content area for mobile */
+    .flex-1 {
+        margin-right: 0;
+        width: 100%;
+        padding: 1rem;
+    }
+    
+    /* Adjust footer for mobile */
+    footer {
+        position: static;
+        margin-top: 1rem;
+        height: auto;
+    }
+    
+    /* Fix chart height for mobile */
+    .h-64 {
+        height: 250px;
+    }
+    
+    /* Adjust form fields for mobile */
+    .grid-cols-3 {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    /* Adjust history items for mobile */
+    .history-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .history-item .test-info {
+        margin-bottom: 0.5rem;
+        width: 100%;
+    }
+    
+    /* Make min-height smaller for mobile */
+    .min-h-screen {
+        min-height: auto;
+    }
+    
+    /* Make buttons more finger-friendly on mobile */
+    button {
+        padding: 0.5rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Fix datepicker for mobile */
+    .persian-datepicker-container {
+        right: 0 !important;
+        left: 0 !important;
+        width: 90% !important;
+        margin: 0 auto;
+    }
+}
+
+/* Medium screen adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .w-64 {
+        width: 40%;
+    }
+    
+    .flex-1 {
+        margin-right: 40%;
+    }
+}
+
+/* Additional styling fixes */
+.subject-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Fix for navbar being hidden under header on mobile */
+#subject-list {
+    margin-bottom: 1rem;
+}
+
+/* Improve scrolling on mobile */
+body {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure content doesn't overflow on small screens */
+.overflow-x-auto {
+    max-width: 100vw;
+}
+
+/* Ensure text in history items doesn't overflow */
+.test-info {
+    word-break: break-word;
+}
+
+        
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <header class="bg-blue-500 text-white p-4 text-center fixed top-0 w-full z-50 h-16">
+        <h1 class="text-xl font-bold">سامانه پیگیری آزمون‌ها</h1>
+    </header>
+    
+    <div class="flex mt-16 mb-16 min-h-screen">
+        <div class="w-64 bg-gray-800 text-white p-4 overflow-y-auto h-screen fixed">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold mb-2">افزودن درس جدید</h3>
+                <div class="mb-2">
+                    <input type="text" id="subject-name" placeholder="نام درس" class="w-full p-2 rounded border border-gray-300 text-gray-800">
+                </div>
+                <button id="add-subject-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors w-full">افزودن درس</button>
+            </div>
+            
+            <h3 class="text-lg font-semibold mb-2">لیست دروس</h3>
+            <ul class="subject-list" id="subject-list">
+                <!-- Subject list will be generated here -->
+            </ul>
+        </div>
+        
+        <div class="flex-1 p-4 mr-64">
+            <div id="welcome-tab" class="hidden-tab active">
+                <h2 class="text-2xl font-bold mb-4">به سامانه پیگیری آزمون‌ها خوش آمدید</h2>
+                <p class="text-gray-700">لطفاً از منوی سمت راست یک درس را انتخاب کنید یا درس جدیدی اضافه نمایید.</p>
+            </div>
+            
+            <!-- Subject tabs will be generated here -->
+        </div>
+    </div>
+    
+    <footer class="bg-blue-500 text-white p-4 text-center fixed bottom-0 w-full h-16">
+        <p >سامانه پیگیری آزمون‌ها - تمامی حقوق محفوظ است</p>
+    </footer>
+    
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDMgRrnyOKru9OYCbfXAtqi3Ld9Lbdp9JU",
+            authDomain: "exam-grade-a0b82.firebaseapp.com",
+            projectId: "exam-grade-a0b82",
+            storageBucket: "exam-grade-a0b82.firebasestorage.app",
+            messagingSenderId: "558522991887",
+            appId: "1:558522991887:web:eef2cf4178ec0cdb922a7a",
+            measurementId: "G-Z8Y80W2YJ3"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Main application functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hide all tabs except the active one
+            document.querySelectorAll('.hidden-tab').forEach(tab => {
+                if (!tab.classList.contains('active')) {
+                    tab.style.display = 'none';
+                } else {
+                    tab.style.display = 'block';
+                }
+            });
+            
+            // Load subjects from Firestore
+            function loadSubjects() {
+                db.collection("subjects").orderBy("name").get().then((querySnapshot) => {
+                    const subjects = [];
+                    querySnapshot.forEach((doc) => {
+                        subjects.push({
+                            id: doc.id,
+                            name: doc.data().name
+                        });
+                    });
+                    renderSubjects(subjects);
+                }).catch((error) => {
+                    console.error("Error loading subjects: ", error);
+                    alert('خطا در بارگیری دروس: ' + error.message);
+                });
+            }
+            
+            // Render subjects in sidebar
+function renderSubjects(subjects) {
+    const subjectList = document.getElementById('subject-list');
+    subjectList.innerHTML = '';
+
+    subjects.forEach((subject) => {
+        const li = document.createElement('li');
+        li.className = 'py-2 px-2 mb-2 bg-gray-700 rounded cursor-pointer flex justify-between items-center';
+
+        // کلیک روی کل لیست آیتم باعث نمایش تب شود
+        li.addEventListener('click', () => showSubjectTab(subject.id, subject.name));
+
+        const subjectName = document.createElement('span');
+        subjectName.textContent = subject.name;
+
+        const actions = document.createElement('div');
+        actions.className = 'flex space-x-2';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.className = 'text-white bg-transparent border-none cursor-pointer';
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // جلوگیری از فعال شدن کلیک روی `li`
+            editSubject(subject.id, subject.name);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '❌';
+        deleteBtn.className = 'text-white bg-transparent border-none cursor-pointer';
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // جلوگیری از فعال شدن کلیک روی `li`
+            deleteSubject(subject.id, subject.name);
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(subjectName);
+        li.appendChild(actions);
+        subjectList.appendChild(li);
+    });
+}
+
+            
+            // Add a new subject
+            document.getElementById('add-subject-btn').addEventListener('click', function() {
+                const subjectName = document.getElementById('subject-name').value.trim();
+                if (subjectName) {
+                    // Check if subject already exists
+                    db.collection("subjects").where("name", "==", subjectName).get().then((querySnapshot) => {
+                        if (querySnapshot.empty) {
+                            // Add subject to Firestore
+                            db.collection("subjects").add({
+                                name: subjectName,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            })
+                            .then((docRef) => {
+                                document.getElementById('subject-name').value = '';
+                                loadSubjects();
+                                showSubjectTab(docRef.id, subjectName);
+                            })
+                            .catch((error) => {
+                                console.error("Error adding subject: ", error);
+                                alert('خطا در افزودن درس: ' + error.message);
+                            });
+                        } else {
+                            alert('این درس قبلاً اضافه شده است!');
+                        }
+                    });
+                }
+            });
+            
+            // Edit subject name
+            function editSubject(subjectId, currentName) {
+                const newName = prompt("نام جدید درس را وارد کنید:", currentName);
+                if (newName && newName.trim() !== "" && newName !== currentName) {
+                    // Update subject name in Firestore
+                    db.collection("subjects").doc(subjectId).update({
+                        name: newName
+                    })
+                    .then(() => {
+                        loadSubjects();
+                        
+                        // Update tab if it exists
+                        const oldTab = document.getElementById(`${subjectId}-tab`);
+                        if (oldTab) {
+                            const titleElement = oldTab.querySelector('h2');
+                            if (titleElement) titleElement.textContent = newName;
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error updating subject: ", error);
+                        alert('خطا در بروزرسانی درس: ' + error.message);
+                    });
+                }
+            }
+            
+            // Delete subject
+            function deleteSubject(subjectId, subjectName) {
+                if (confirm(`آیا از حذف درس "${subjectName}" اطمینان دارید؟`)) {
+                    // Delete all tests for this subject first
+                    db.collection("tests").where("subjectId", "==", subjectId)
+                        .get()
+                        .then((querySnapshot) => {
+                            const batch = db.batch();
+                            querySnapshot.forEach((doc) => {
+                                batch.delete(doc.ref);
+                            });
+                            return batch.commit();
+                        })
+                        .then(() => {
+                            // Now delete the subject
+                            return db.collection("subjects").doc(subjectId).delete();
+                        })
+                        .then(() => {
+                            loadSubjects();
+                            // Remove subject tab if exists
+                            const subjectTab = document.getElementById(`${subjectId}-tab`);
+                            if (subjectTab) {
+                                subjectTab.remove();
+                            }
+                            
+                            // Show welcome tab
+                            const welcomeTab = document.getElementById('welcome-tab');
+                            welcomeTab.style.display = 'block';
+                            welcomeTab.classList.add('active');
+                        })
+                        .catch((error) => {
+                            console.error("Error deleting subject: ", error);
+                            alert('خطا در حذف درس: ' + error.message);
+                        });
+                }
+            }
+            
+            // Show subject tab
+            function showSubjectTab(subjectId, subjectName) {
+                // Hide all tabs
+                document.querySelectorAll('.hidden-tab').forEach(tab => {
+                    tab.style.display = 'none';
+                    tab.classList.remove('active');
+                });
+                
+                let subjectTab = document.getElementById(`${subjectId}-tab`);
+                
+                // Create tab if it doesn't exist
+                if (!subjectTab) {
+                    subjectTab = createSubjectTab(subjectId, subjectName);
+                }
+                
+                // Show selected tab
+                subjectTab.style.display = 'block';
+                subjectTab.classList.add('active');
+                
+                // Render test history
+                renderTestHistory(subjectId);
+                
+                // Update chart
+                updateChart(subjectId);
+            }
+            
+            // Create subject tab
+            function createSubjectTab(subjectId, subjectName) {
+                const mainContent = document.querySelector('.flex-1');
+                
+                const subjectTab = document.createElement('div');
+                subjectTab.id = `${subjectId}-tab`;
+                subjectTab.className = 'hidden-tab';
+                
+                subjectTab.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4">${subjectName}</h2>
+                    
+                    <div class="bg-white p-4 rounded-lg shadow-md mb-4">
+                        <h3 class="text-lg font-semibold mb-2">افزودن آزمون جدید</h3>
+                        <div class="mb-3">
+                            <label for="${subjectId}-test-title" class="block mb-1">عنوان آزمون</label>
+                            <input type="text" id="${subjectId}-test-title" placeholder="عنوان آزمون" class="w-full p-2 border border-gray-300 rounded">
+                        </div>
+                        <div class="mb-3">
+                            <label for="${subjectId}-test-date" class="block mb-1">تاریخ آزمون</label>
+                            <input type="text" id="${subjectId}-test-date" class="date-picker w-full p-2 border border-gray-300 rounded" placeholder="تاریخ آزمون">
+                        </div>
+                        <div class="mb-3">
+                            <label for="${subjectId}-test-score" class="block mb-1">درصد آزمون</label>
+                            <input type="number" id="${subjectId}-test-score" min="0" max="100" placeholder="درصد آزمون" class="w-full p-2 border border-gray-300 rounded">
+                        </div>
+                        <button class="add-test-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors" data-subject-id="${subjectId}">افزودن آزمون</button>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg shadow-md mb-4 h-64">
+                        <canvas id="${subjectId}-chart"></canvas>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold mb-2">تاریخچه آزمون‌ها</h3>
+                        <div id="${subjectId}-history" class="mb-2"></div>
+                        <button class="export-csv-btn bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600 transition-colors text-sm" data-subject-id="${subjectId}" data-subject-name="${subjectName}">دانلود CSV</button>
+                    </div>
+                `;
+                
+                mainContent.appendChild(subjectTab);
+                
+                // Initialize date picker for the new tab
+                try {
+                    $(`#${subjectId}-test-date`).persianDatepicker({
+                        format: 'YYYY/MM/DD',
+                        autoClose: true
+                    });
+                } catch (e) {
+                    console.error('Error initializing date picker:', e);
+                    document.querySelector(`#${subjectId}-test-date`).type = 'date';
+                }
+                
+                // Add event listener for adding a new test
+                subjectTab.querySelector('.add-test-btn').addEventListener('click', () => {
+                    addTest(subjectId, subjectName);
+                });
+                
+                // Add event listener for CSV export
+                subjectTab.querySelector('.export-csv-btn').addEventListener('click', (e) => {
+                    const subjectName = e.target.getAttribute('data-subject-name');
+                    exportToCSV(subjectId, subjectName);
+                });
+                
+                return subjectTab;
+            }
+            
+            // Add a new test
+            function addTest(subjectId, subjectName) {
+                const titleInput = document.getElementById(`${subjectId}-test-title`);
+                const dateInput = document.getElementById(`${subjectId}-test-date`);
+                const scoreInput = document.getElementById(`${subjectId}-test-score`);
+                
+                const title = titleInput.value.trim();
+                const date = dateInput.value.trim();
+                const score = parseFloat(scoreInput.value);
+                
+                if (title && date && !isNaN(score) && score >= 0 && score <= 100) {
+                    // Add test to Firestore
+                    db.collection("tests").add({
+                        subjectId: subjectId,
+                        subjectName: subjectName,
+                        title: title,
+                        date: date,
+                        score: score,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    })
+                    .then(() => {
+                        // Clear form
+                        titleInput.value = '';
+                        dateInput.value = '';
+                        scoreInput.value = '';
+                        
+                        // Update history and chart
+                        renderTestHistory(subjectId);
+                        updateChart(subjectId);
+                    })
+                    .catch((error) => {
+                        console.error("Error adding test: ", error);
+                        alert('خطا در افزودن آزمون: ' + error.message);
+                    });
+                } else {
+                    alert('لطفاً تمام فیلدها را به درستی پر کنید!');
+                }
+            }
+            
+            // Edit a test
+            function editTest(testId, subjectId) {
+                // Get the test data
+                db.collection("tests").doc(testId).get().then((doc) => {
+                    if (doc.exists) {
+                        const test = doc.data();
+                        
+                        // Get the test history item
+                        const historyItem = document.querySelector(`.history-item[data-id="${testId}"]`);
+                        if (!historyItem) return;
+                        
+                        // Create edit form
+                        const editForm = document.createElement('div');
+                        editForm.className = 'bg-gray-100 p-2 rounded mb-2';
+                        
+                        editForm.innerHTML = `
+                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                <input type="text" class="edit-title p-1 border border-gray-300 rounded" value="${test.title}" placeholder="عنوان آزمون">
+                                <input type="text" class="edit-date p-1 border border-gray-300 rounded" value="${test.date}" placeholder="تاریخ آزمون">
+                                <input type="number" class="edit-score p-1 border border-gray-300 rounded" value="${test.score}" min="0" max="100" placeholder="درصد آزمون">
+                            </div>
+                            <div class="flex space-x-2">
+                                <button class="save-edit bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors text-sm">ذخیره</button>
+                                <button class="cancel-edit bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 transition-colors text-sm">لغو</button>
+                            </div>
+                        `;
+                        
+                        // Replace history item with edit form
+                        historyItem.style.display = 'none';
+                        historyItem.parentNode.insertBefore(editForm, historyItem);
+                        
+                        // Save edit
+                        editForm.querySelector('.save-edit').addEventListener('click', () => {
+                            const newTitle = editForm.querySelector('.edit-title').value.trim();
+                            const newDate = editForm.querySelector('.edit-date').value.trim();
+                            const newScore = parseFloat(editForm.querySelector('.edit-score').value);
+                            
+                            if (newTitle && newDate && !isNaN(newScore) && newScore >= 0 && newScore <= 100) {
+                                // Update test in Firestore
+                                db.collection("tests").doc(testId).update({
+                                    title: newTitle,
+                                    date: newDate,
+                                    score: newScore
+                                })
+                                .then(() => {
+                                    renderTestHistory(subjectId);
+                                    updateChart(subjectId);
+                                })
+                                .catch((error) => {
+                                    console.error("Error updating test: ", error);
+                                    alert('خطا در بروزرسانی آزمون: ' + error.message);
+                                });
+                            } else {
+                                alert('لطفاً تمام فیلدها را به درستی پر کنید!');
+                            }
+                        });
+                        
+                        // Cancel edit
+                        editForm.querySelector('.cancel-edit').addEventListener('click', () => {
+                            editForm.remove();
+                            historyItem.style.display = '';
+                        });
+                    }
+                });
+            }
+            
+            // Delete a test
+            function deleteTest(testId, subjectId) {
+                if (confirm('آیا از حذف این آزمون اطمینان دارید؟')) {
+                    // Delete test from Firestore
+                    db.collection("tests").doc(testId).delete()
+                    .then(() => {
+                        renderTestHistory(subjectId);
+                        updateChart(subjectId);
+                    })
+                    .catch((error) => {
+                        console.error("Error deleting test: ", error);
+                        alert('خطا در حذف آزمون: ' + error.message);
+                    });
+                }
+            }
+            
+            // Render test history
+            function renderTestHistory(subjectId) {
+                const historyContainer = document.getElementById(`${subjectId}-history`);
+                if (!historyContainer) return;
+                
+                historyContainer.innerHTML = '<div class="py-2 text-center text-gray-500">در حال بارگذاری...</div>';
+                
+                // Get tests from Firestore
+                db.collection("tests")
+                    .where("subjectId", "==", subjectId)
+                    .orderBy("date", "desc")
+                    .get()
+                    .then((querySnapshot) => {
+                        historyContainer.innerHTML = '';
+                        
+                        if (querySnapshot.empty) {
+                            historyContainer.innerHTML = '<p class="text-gray-500 text-center py-2">هنوز آزمونی ثبت نشده است.</p>';
+                            return;
+                        }
+                        
+                        querySnapshot.forEach((doc) => {
+                            const test = doc.data();
+                            const historyItem = document.createElement('div');
+                            historyItem.className = 'history-item flex justify-between items-center p-2 border-b border-gray-200';
+                            historyItem.dataset.id = doc.id;
+                            
+                            historyItem.innerHTML = `
+                                <div class="test-info">
+                                    <strong>${test.title}</strong> - 
+                                    <span>${test.date}</span> - 
+                                    <span>درصد: ${test.score}%</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="edit-test-btn bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 transition-colors text-xs">ویرایش</button>
+                                    <button class="delete-test-btn bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors text-xs">حذف</button>
+                                </div>
+                            `;
+                            
+                            historyContainer.appendChild(historyItem);
+                            
+                            // Add event listeners for edit and delete
+                            historyItem.querySelector('.edit-test-btn').addEventListener('click', () => {
+                                editTest(doc.id, subjectId);
+                            });
+                            
+                            historyItem.querySelector('.delete-test-btn').addEventListener('click', () => {
+                                deleteTest(doc.id, subjectId);
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error("Error getting tests: ", error);
+                        historyContainer.innerHTML = `<p class="text-red-500 text-center py-2">خطا در بارگذاری داده‌ها: ${error.message}</p>`;
+                    });
+            }
+            
+            // Update chart
+            function updateChart(subjectId) {
+                const chartCanvas = document.getElementById(`${subjectId}-chart`);
+                if (!chartCanvas) return;
+                
+                const ctx = chartCanvas.getContext('2d');
+                
+                // Destroy existing chart if it exists
+                if (window.chartObjects && window.chartObjects[subjectId]) {
+                    window.chartObjects[subjectId].destroy();
+                }
+                
+                // Initialize chartObjects if it doesn't exist
+                if (!window.chartObjects) {
+                    window.chartObjects = {};
+                }
+                
+                // Get tests from Firestore
+                db.collection("tests")
+                    .where("subjectId", "==", subjectId)
+                    .orderBy("date", "asc")
+                    .get()
+                    .then((querySnapshot) => {
+                        if (querySnapshot.empty) {
+                            ctx.font = '14px Arial';
+                            ctx.fillStyle = '#6B7280';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('هنوز آزمونی ثبت نشده است', chartCanvas.width / 2, chartCanvas.height / 2);
+                            return;
+                        }
+                        
+                        const tests = [];
+                        querySnapshot.forEach((doc) => {
+                            tests.push(doc.data());
+                        });
+                        
+                        const labels = tests.map(test => test.title);
+                        const scores = tests.map(test => test.score);
+                        
+                        // Generate colors based on score values
+                        const backgroundColor = scores.map(score => {
+                            if (score < 35) return 'rgba(239, 68, 68, 0.6)'; // red-500
+                            if (score < 45) return 'rgba(245, 158, 11, 0.6)'; // amber-500
+                            return 'rgba(16, 185, 129, 0.6)'; // emerald-500
+                        });
+                        
+                        const borderColor = scores.map(score => {
+                            if (score < 35) return 'rgb(220, 38, 38)'; // red-600
+                            if (score < 45) return 'rgb(217, 119, 6)'; // amber-600
+                            return 'rgb(5, 150, 105)'; // emerald-600
+                        });
+                        
+                        // Create new chart
+                        window.chartObjects[subjectId] = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'درصد آزمون',
+                                    data: scores,
+                                    backgroundColor: backgroundColor,
+                                    borderColor: borderColor,
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: 100,
+                                        title: {
+                                            display: true,
+                                            text: 'درصد'
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'آزمون‌ها'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    })
+                    .catch((error) => {
+                        console.error("Error getting tests for chart: ", error);
+                        ctx.font = '14px Arial';
+                        ctx.fillStyle = '#EF4444';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`خطا در بارگذاری نمودار: ${error.message}`, chartCanvas.width / 2, chartCanvas.height / 2);
+                    });
+            }
+            
+            // Export to CSV
+            function exportToCSV(subjectId, subjectName) {
+                db.collection("tests")
+                    .where("subjectId", "==", subjectId)
+                    .orderBy("date", "desc")
+                    .get()
+                    .then((querySnapshot) => {
+                        if (querySnapshot.empty) {
+                            alert('هیچ داده‌ای برای دانلود وجود ندارد!');
+                            return;
+                        }
+                        
+                        // ایجاد محتوای CSV با BOM برای پشتیبانی از UTF-8
+                        let csvContent = '\uFEFF'; // اضافه کردن BOM
+                        csvContent += 'عنوان آزمون,تاریخ آزمون,درصد آزمون\n';
+                        
+                        querySnapshot.forEach((doc) => {
+                            const test = doc.data();
+                            csvContent += `"${test.title}","${test.date}","${test.score}"\n`;
+                        });
+                        
+                        // ایجاد لینک دانلود با رمزگذاری مناسب
+                        const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+                        const link = document.createElement('a');
+                        link.setAttribute('href', encodedUri);
+                        link.setAttribute('download', `${subjectName}.csv`);
+                        document.body.appendChild(link);
+                        
+                        // فعال سازی دانلود
+                        link.click();
+                        
+                        // پاکسازی
+                        document.body.removeChild(link);
+                    })
+                    .catch((error) => {
+                        console.error("Error exporting to CSV: ", error);
+                    });
+            }
+            
+            // Load subjects on page load
+            loadSubjects();
+        });
+    </script>
+</body>
+</html>
